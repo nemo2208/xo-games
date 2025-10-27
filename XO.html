@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Trò chơi XO Triết</title>
+<style>
+body{font-family:Inter,Arial,sans-serif;background:#0f172a;color:#e5e7eb;display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0}
+.wrap{width:95%;max-width:900px;background:#111827;border-radius:12px;padding:20px;box-shadow:0 0 25px rgba(0,0,0,0.4)}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
+.cell{background:#1e293b;color:#f1f5f9;font-size:42px;display:flex;align-items:center;justify-content:center;height:100px;border-radius:8px;cursor:pointer;transition:0.2s}
+.cell.disabled{opacity:.6;cursor:not-allowed}
+.status{margin:6px 0;color:#cbd5e1;min-height:22px}
+.questions-grid{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:10px 0}
+.qnum{background:#1d4ed8;color:white;border:none;padding:6px 0;border-radius:6px;cursor:pointer;font-weight:600;transition:.2s}
+.qnum:hover{background:#2563eb}
+.qnum.answered{background:#334155;color:#64748b;cursor:not-allowed;opacity:0.6}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;visibility:hidden;opacity:0;transition:.2s}
+.modal.show{visibility:visible;opacity:1}
+.qcard{background:#0b1120;padding:18px;border-radius:10px;width:min(700px,90%)}
+.qtext{margin-bottom:12px;font-weight:600}
+.options{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opt{padding:10px;background:#1e293b;color:white;border:none;border-radius:6px;cursor:pointer;text-align:left;font-size:14px;transition:.2s}
+.opt:hover{background:#334155}
+.opt.correct{background:#16a34a;color:white}
+.opt.wrong{background:#dc2626;color:white}
+footer{margin-top:10px;color:#94a3b8;font-size:13px;text-align:right}
+.btn{padding:6px 10px;border:none;border-radius:6px;cursor:pointer;margin-left:5px}
+.btn.primary{background:#38bdf8;color:#0f172a;font-weight:600}
+.team{cursor:pointer;padding:6px 12px;border-radius:6px;background:#1e293b;margin-right:8px;display:inline-block;transition:.2s}
+.team.active{background:#38bdf8;color:#0f172a;font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <span id="teamX" class="team">Đội X</span>
+      <span id="teamO" class="team">Đội O</span>
+    </div>
+    <div>
+      <button id="next" class="btn">Next Match</button>
+      <button id="reset" class="btn primary">Reset</button>
+    </div>
+  </header>
+
+  <div class="status" id="status">Chọn đội để bắt đầu.</div>
+  <div class="board" id="board"></div>
+
+  <div>
+    <div class="status">Chọn câu hỏi (Tổng 27 câu):</div>
+    <div class="questions-grid" id="qGrid"></div>
+  </div>
+
+  <footer>✅ Đúng: đội hiện tại đánh | ❌ Sai: đội đối thủ chọn ô để đánh hộ đội sai.</footer>
+</div>
+
+<!-- Modal hiển thị câu hỏi -->
+<div class="modal" id="modal">
+  <div class="qcard">
+    <div class="qtext" id="qText"></div>
+    <div class="options" id="qOpts"></div>
+    <div class="status" id="feedback"></div>
+    <div style="text-align:right;margin-top:10px">
+      <button class="btn" id="closeModal">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* --- Toàn bộ 27 câu hỏi --- */
+const questions=[
+{id:1,q:"Theo V.I. Lênin, giai cấp là gì?",opts:["A. Nhóm người có cùng sở thích","B. Nhóm người khác nhau về địa vị trong sản xuất","C. Nhóm nghề nghiệp","D. Tầng lớp giàu có"],ans:1},
+{id:2,q:"Nguồn gốc hình thành giai cấp?",opts:["A. Phân biệt chủng tộc","B. Tư hữu và phân công lao động xã hội","C. Giới tính","D. Phát triển công nghệ"],ans:1},
+{id:3,q:"Quan hệ giữa các giai cấp cơ bản là?",opts:["A. Hợp tác bình đẳng","B. Đối lập lợi ích KT-CT","C. Cạnh tranh tự do","D. Không mâu thuẫn"],ans:1},
+{id:4,q:"Kết cấu XH - giai cấp gồm?",opts:["A. Dân tộc, giới tính, tôn giáo","B. Giai cấp, tầng lớp xã hội","C. Địa lý, văn hóa","D. Chính trị, pháp luật"],ans:1},
+{id:5,q:"Giai cấp thống trị là?",opts:["A. Đông nhất","B. Nắm quyền KT-CT-TT","C. Học vấn cao","D. Thu nhập TB"],ans:1},
+{id:6,q:"Trong CNTB, hai giai cấp cơ bản là?",opts:["A. Địa chủ-nông dân","B. Quý tộc-nông nô","C. Tư sản-vô sản","D. Nông dân-tiểu thương"],ans:2},
+{id:7,q:"Di chuyển giữa các giai cấp gọi là?",opts:["A. Biến động","B. Phân tầng","C. Di động xã hội","D. Tái cấu trúc"],ans:2},
+{id:8,q:"Đấu tranh giai cấp là?",opts:["A. Cạnh tranh cá nhân","B. Đấu tranh giữa giai cấp đối lập lợi ích KT-CT-XH","C. Chiến tranh quốc gia","D. Xung đột văn hóa"],ans:1},
+{id:9,q:"Nguồn gốc tất yếu của đấu tranh giai cấp?",opts:["A. Mâu thuẫn quyền lực","B. Mâu thuẫn lợi ích kinh tế","C. Mâu thuẫn tôn giáo","D. Khoa học kỹ thuật"],ans:1},
+{id:10,q:"Thực chất đấu tranh giai cấp là?",opts:["A. Văn hóa","B. Quyền lực KT-CT","C. Cá nhân","D. Chiến tranh"],ans:1},
+{id:11,q:"Vai trò của đấu tranh giai cấp?",opts:["A. Rối loạn","B. Động lực lịch sử","C. Suy tàn","D. Không vai trò"],ans:1},
+{id:12,q:"Mục tiêu cuối cùng của vô sản?",opts:["A. Chiếm đoạt tài sản","B. Xóa bỏ giai cấp","C. Giành quyền tạm thời","D. Tăng thu nhập"],ans:1},
+{id:13,q:"Đấu tranh giai cấp trong CNXH?",opts:["A. Không còn","B. Tồn tại với nội dung mới","C. Gay gắt hơn","D. Chỉ trong kinh tế"],ans:1},
+{id:14,q:"Hình thức cơ bản của đấu tranh giai cấp?",opts:["A. Quân sự","B. Chính trị, tư tưởng, kinh tế","C. Cá nhân","D. Tôn giáo"],ans:1},
+{id:15,q:"Cuộc đấu tranh làm sụp đổ phong kiến?",opts:["A. Cách mạng Pháp 1789","B. CN công nghiệp","C. Cách mạng xanh","D. KHKT"],ans:0},
+{id:16,q:"Cách mạng Tháng Mười Nga 1917 là giữa?",opts:["A. Nông dân-địa chủ","B. Tư sản-phong kiến","C. Vô sản-tư sản","D. Nông dân-tư sản"],ans:2},
+{id:17,q:"Đấu tranh giai cấp ở VN gắn liền với?",opts:["A. Dân tộc giải phóng","B. Tôn giáo","C. Kinh tế","D. Chính trị nội bộ"],ans:0},
+{id:18,q:"Đấu tranh giai cấp thời đổi mới?",opts:["A. Xóa tư hữu","B. Chống tham nhũng, bất công","C. Quân sự","D. Lật đổ NN"],ans:1},
+{id:19,q:"Lực lượng lãnh đạo ở VN?",opts:["A. NN tư sản","B. Đảng CSVN","C. DN tư nhân","D. Công đoàn QT"],ans:1},
+{id:20,q:"Mục tiêu cuối cùng đấu tranh giai cấp VN?",opts:["A. Giành TLSX","B. Thị trường tự do","C. Dân giàu nước mạnh CNXH","D. GDP"],ans:2},
+{id:21,q:"Chênh lệch giàu nghèo ở VN phản ánh điều gì?",opts:["A. Mọi người đều cơ hội như nhau","B. XH không còn giai cấp","C. Kết cấu XH–GC vẫn tồn tại & biến đổi","D. Ai cũng thành chủ TLSX"],ans:2},
+{id:22,q:"Công nghệ, robot, AI thay đổi điều gì?",opts:["A. Mất việc tạm thời","B. Không ảnh hưởng XH","C. Làm biến đổi lực lượng SX, dẫn đến thay đổi GC","D. Quay lại nguyên thủy"],ans:2},
+{id:23,q:"Người sở hữu công ty, đất đai còn người khác làm thuê thể hiện:",opts:["A. Hợp tác bình đẳng","B. Quan hệ SX có tính GC","C. Không bóc lột","D. Chia sẻ lợi ích công bằng"],ans:1},
+{id:24,q:"Tầng lớp trung lưu tăng lên cho thấy:",opts:["A. Không phân hóa","B. Kết cấu XH–GC ổn định mãi","C. Kết cấu XH–GC vận động tích cực","D. Vô sản chiếm ưu thế tuyệt đối"],ans:2},
+{id:25,q:"Học tập, rèn luyện giúp con người:",opts:["A. Giữ nguyên vị trí","B. Việc nhẹ hơn","C. Có thể thay đổi vị trí GC/TLSX","D. Không ảnh hưởng địa vị"],ans:2},
+{id:26,q:"Nhiều người trẻ muốn khởi nghiệp thể hiện:",opts:["A. Ý thức vươn lên làm chủ","B. Chán nản lao động","C. Từ bỏ GC","D. Muốn nhàn hạ"],ans:0},
+{id:27,q:"Chính sách an sinh xã hội giúp:",opts:["A. Biến mất GC","B. Giảm mâu thuẫn, thu hẹp khoảng cách GC","C. Tạo GC mới","D. Không liên quan GC"],ans:1},
+];
+
+let boardState=Array(9).fill(null);
+let currentPlayer=null;
+let gameOver=false;
+let chosenCell=null;
+let answered={};
+let waitingForOpponent=false;
+let teamToBePlaced=null;
+let currentMatch=1;
+
+const board=document.getElementById("board");
+const status=document.getElementById("status");
+const modal=document.getElementById("modal");
+const qText=document.getElementById("qText");
+const qOpts=document.getElementById("qOpts");
+const feedback=document.getElementById("feedback");
+const qGrid=document.getElementById("qGrid");
+
+function buildBoard(){
+  board.innerHTML="";
+  for(let i=0;i<9;i++){
+    const d=document.createElement("div");
+    d.className="cell";
+    d.dataset.i=i;
+    d.onclick=()=>onCellClick(i);
+    board.appendChild(d);
+  }
+}
+
+function buildQuestionGrid(){
+  qGrid.innerHTML="";
+  for(let i=1;i<=27;i++){
+    const btn=document.createElement("button");
+    btn.className="qnum";
+    if(answered[i])btn.classList.add("answered");
+    btn.textContent=i;
+    btn.dataset.id=i;
+    if(!answered[i])btn.onclick=()=>selectQuestion(i);
+    qGrid.appendChild(btn);
+  }
+}
+
+function onCellClick(i){
+  if(gameOver)return;
+  if(waitingForOpponent){
+    if(boardState[i])return;
+    boardState[i]=teamToBePlaced;
+    waitingForOpponent=false;
+    finishTurnAfterMove();
+    return;
+  }
+  if(boardState[i]||!currentPlayer)return;
+  chosenCell=i;
+  status.textContent="Chọn câu hỏi.";
+}
+
+function selectQuestion(id){
+  if(chosenCell===null||answered[id])return;
+  openQuestion(id);
+}
+
+function openQuestion(id){
+  const q=questions.find(x=>x.id===id);
+  modal.classList.add("show");
+  qText.textContent=q.q;
+  qOpts.innerHTML="";
+  feedback.textContent="";
+  q.opts.forEach((op,idx)=>{
+    const b=document.createElement("button");
+    b.className="opt";
+    b.textContent=op;
+    b.onclick=()=>checkAnswer(q,idx);
+    qOpts.appendChild(b);
+  });
+}
+
+function checkAnswer(q,idx){
+  Array.from(qOpts.children).forEach((b,i)=>{
+    b.disabled=true;
+    if(i===q.ans)b.classList.add("correct");
+    if(i===idx&&i!==q.ans)b.classList.add("wrong");
+  });
+  const correct=idx===q.ans;
+  feedback.textContent=correct?"✅ Đúng rồi!":"❌ Sai rồi!";
+  answered[q.id]=true;
+  setTimeout(()=>{
+    modal.classList.remove("show");
+    applyMove(correct);
+  },900);
+}
+
+function applyMove(correct){
+  if(chosenCell===null)return;
+  if(correct){
+    boardState[chosenCell]=currentPlayer;
+    finishTurnAfterMove();
+  }else{
+    waitingForOpponent=true;
+    teamToBePlaced=currentPlayer;
+    status.textContent="❌ Sai rồi! Đội "+(currentPlayer==='X'?'O':'X')+" hãy chọn 1 ô trống để đánh hộ đội "+currentPlayer+".";
+  }
+  updateBoard();
+  buildQuestionGrid();
+}
+
+function finishTurnAfterMove(){
+  updateBoard();
+  const win=checkWin();
+  if(win){
+    status.textContent="🎉 Đội "+win+" thắng trận "+currentMatch+"!";
+    gameOver=true;
+    return;
+  }
+  if(boardState.every(Boolean)){
+    status.textContent="Hòa trận "+currentMatch+"!";
+    gameOver=true;
+    return;
+  }
+  currentPlayer=currentPlayer==='X'?'O':'X';
+  status.textContent="Lượt của đội "+currentPlayer;
+  chosenCell=null;
+}
+
+function updateBoard(){
+  const cells=document.querySelectorAll(".cell");
+  cells.forEach((c,i)=>{
+    c.textContent=boardState[i]||"";
+    c.classList.toggle("disabled",!!boardState[i]);
+    if(boardState[i]==='X')c.style.color="#f87171";
+    else if(boardState[i]==='O')c.style.color="#38bdf8";
+  });
+}
+
+function checkWin(){
+  const lines=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  for(const [a,b,c]of lines){
+    if(boardState[a]&&boardState[a]===boardState[b]&&boardState[a]===boardState[c])return boardState[a];
+  }
+  return null;
+}
+
+function resetGame(){
+  boardState=Array(9).fill(null);
+  currentPlayer=null;
+  gameOver=false;
+  chosenCell=null;
+  answered={};
+  waitingForOpponent=false;
+  teamToBePlaced=null;
+  currentMatch=1;
+  buildBoard();
+  buildQuestionGrid();
+  status.textContent="Chọn đội để bắt đầu.";
+}
+
+function nextMatch(){
+  if(currentMatch>=3){alert("Đã hết 3 trận!");return;}
+  currentMatch++;
+  boardState=Array(9).fill(null);
+  gameOver=false;
+  chosenCell=null;
+  waitingForOpponent=false;
+  teamToBePlaced=null;
+  buildBoard();
+  buildQuestionGrid();
+  status.textContent="Bắt đầu trận "+currentMatch+". Đội "+(currentPlayer||"X")+" chơi trước.";
+}
+
+document.getElementById("teamX").onclick=()=>{if(gameOver)return;currentPlayer='X';document.getElementById("teamX").classList.add("active");document.getElementById("teamO").classList.remove("active");status.textContent="Đội X bắt đầu.";}
+document.getElementById("teamO").onclick=()=>{if(gameOver)return;currentPlayer='O';document.getElementById("teamO").classList.add("active");document.getElementById("teamX").classList.remove("active");status.textContent="Đội O bắt đầu.";}
+document.getElementById("closeModal").onclick=()=>modal.classList.remove("show");
+document.getElementById("reset").onclick=resetGame;
+document.getElementById("next").onclick=nextMatch;
+
+buildBoard();
+buildQuestionGrid();
+</script>
+</body>
+</html>
